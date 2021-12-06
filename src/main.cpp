@@ -4,8 +4,6 @@
 #include <PubSubClient.h>
 #include <iostream>
 #include <string>
-#include <ctime>
-#include <ESP8266WiFi.h>
 
 using namespace std;
 
@@ -29,45 +27,19 @@ boolean dot = false;
 // current time vars
 int hours = 0;
 int minutes = 0;
+unsigned long lastMinute = 0;
 // alarm time vars
 boolean alarm_set = false;
-int alarm_hours = 8;
-int alarm_minutes = 46;
+int alarm_hours = 25;
+int alarm_minutes = 0;
 
 #define Delay 1000
-#define MYTZ "EST5EDT,M3.2.0,M11.1.0"  //for New York
 
 WiFiClient wifiClient;
 PubSubClient client(wifiClient);
 
-// Set IFTTT Webhooks event name and key
-#define IFTTT_KEY "cp9mCVLbwEFBof76xY6Sm"
-#define IFTTT_EVENT1 "temp_too_hot"
-#define IFTTT_EVENT2 "temp_too_cold"
-#define IFTTT_EVENT3 "air_too_humid"
-#define IFTTT_EVENT4 "air_too_dry"
-
-int interval = 5000;
-int threshold = 5000;
 int time_now = 0;
 unsigned long lastInterval = 0;
-bool showTempNotHum = true;
-
-// function gets the current time and sets it to the time vars
-void getCurrentTime() {
-  time_t curr_time = time(NULL);;   // get time now
-  struct tm * curtime;
-  time(&curr_time);
-  curtime = localtime(&curr_time);
-
-  hours = curtime->tm_hour;
-  minutes = curtime->tm_min;
-  Serial.print(String(hours) + ":" + String(minutes) + "\n");
-
-  // need to figure out funny way to maintain a fake time, so I could make it
-  // so it finds out how far from current time the sent time is and then it 
-  // continues to update the time from the users given time
-}
 
 void connectWiFi()
 {
@@ -106,6 +78,7 @@ void clientCallback(char *topic, uint8_t *payload, unsigned int length)
   if (rec_topic == "t/time") {
     hours = hrs.toInt();
     minutes = mins.toInt();
+    lastMinute = millis();
   } else {
     alarm_hours = hrs.toInt();
     alarm_minutes = mins.toInt();
@@ -326,18 +299,31 @@ void setup() {
   pinMode(D2, OUTPUT);  
   pinMode(D3, OUTPUT);  
   pinMode(D4, OUTPUT);
-
-  configTime(MYTZ, "pool.ntp.org", "time.nist.gov");
-  getCurrentTime();
 }
 
 void loop() {
-  getCurrentTime();
   reconnectMQTTClient();
   client.loop();
 
-  if (alarm_set) {
+  if (millis() >= lastMinute + 60000) {
+    minutes++;
 
+    if (minutes >= 60) {
+      minutes = 0;
+      hours++;
+    }
+    if (hours >= 23) {
+      hours = 0;
+      minutes = 0;
+    }
+    lastMinute = millis();
+  }
+
+  if (alarm_set) {
+    if (alarm_hours >= hours && alarm_minutes >= minutes) {
+      Serial.print("ALARM ALARM WAKE UP MOTHERFUCKER");
+      alarm_set = false;
+    }
   }
 
   for(int j = 1; j <= 4; j++) {
