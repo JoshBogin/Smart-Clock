@@ -4,6 +4,9 @@
 #include <PubSubClient.h>
 #include <iostream>
 #include <string>
+#include <ctime>
+
+using namespace std;
 
 int pinA = 0;
 int pinB = 1;
@@ -20,17 +23,18 @@ int D3 = 10;
 int D4 = 11;
 int digits[4] = {D1, D2, D3, D4};
 
-boolean duiz = false;
-boolean hon = false;
 boolean dot = false;
 
-// time vars
-int hours = 8;
-//int hr_dig_1 = 8;
-int minutes = 46;
-//int min_dig_1 = 6;
+// current time vars
+int hours = 0;
+int minutes = 0;
+// alarm time vars
+boolean alarm_set = false
+int alarm_hours = 8;
+int alarm_minutes = 46;
 
 #define Delay 1000
+#define MYTZ "EST5EDT,M3.2.0,M11.1.0"  //for New York
 
 WiFiClient wifiClient;
 PubSubClient client(wifiClient);
@@ -46,8 +50,24 @@ int interval = 5000;
 int threshold = 5000;
 int time_now = 0;
 unsigned long lastInterval = 0;
-String intervalStr = "60";
 bool showTempNotHum = true;
+
+// function gets the current time and sets it to the time vars
+void getCurrentTime() {
+  time_t curr_time = time(NULL);;   // get time now
+  struct tm * curtime;
+  time(&curr_time);
+  curtime = localtime(&curr_time);
+
+  hours = curtime->tm_hour;
+  minutes = curtime->tm_min;
+  Serial.print(String(ctime(curtime)) + "\n");
+  Serial.print(String(hours) + ":" + String(minutes) + "\n");
+
+  // need to figure out funny way to maintain a fake time, so I could make it
+  // so it finds out how far from current time the sent time is and then it 
+  // continues to update the time from the users given time
+}
 
 void connectWiFi()
 {
@@ -64,21 +84,35 @@ void connectWiFi()
 
 void clientCallback(char *topic, uint8_t *payload, unsigned int length)
 {
+  String rec_topic = String(topic);
+
   char buff[length + (unsigned int)1];
 
-  for (int i = 0; i < length; i++)
+  for (int i = 0; (unsigned int)i < length; i++)
   {
     buff[i] = (char)payload[i];
   }
   buff[length] = '\0';
 
   Serial.print(buff);
+  Serial.print("\n");
 
   String message = buff;
   String hrs = message.substring(0, 2);
   String mins = message.substring(3, 5);
-  hours = hrs.toInt();
-  minutes = mins.toInt();
+
+  Serial.print(rec_topic + "\n");
+
+  if (rec_topic == "t/time") {
+    hours = hrs.toInt();
+    minutes = mins.toInt();
+  } else {
+    alarm_hours = hrs.toInt();
+    alarm_minutes = mins.toInt();
+    Serial.print("Alarm Set!\n");
+    Serial.print(String(alarm_hours) + ":" + String(alarm_minutes) + "\n");
+    alarm_set = true;
+  }
 }
 
 void reconnectMQTTClient() {
@@ -87,11 +121,12 @@ void reconnectMQTTClient() {
 
     if (client.connect(CLI_NAME.c_str())) {
       Serial.println("Connected");
-      client.subscribe(TOPIC.c_str());
+      client.subscribe(TIME_TOPIC.c_str());
+      client.subscribe(ALARM_TOPIC.c_str());
     } else {
-      Serial.print("Connection Failed! Retrying in 10 seconds...");
+      Serial.print("Connection Failed! Retrying in 5 seconds...");
       Serial.println(client.state());
-      delay(10000);
+      delay(5000);
     }
   }
 }
@@ -269,94 +304,6 @@ void lightNumber(int numberToDisplay, boolean isDot) {
   }
 }
 
-/*
-void num_loop() {
-  for( int i = 0; i <= 9999; i++){
-    duiz = false;
-    hon = false;
-    for (int x = 0; x < 50; x++) {
-      int figur = i;
-      for(int j = 0; j < 4; j++) {
-        //Turn on a digit for a short amount of time
-        switch(j) {
-          case 1:
-            if (figur > 999) {
-              digitalWrite(digits[j], LOW);
-              lightNumber(figur / 1000);            // for example 2511 / 1000 = 2
-              figur %= 1000;                        // new value of figur = 511         figur = figur %1000
-              
-              delayMicroseconds(Delay); 
-              if (figur < 100){
-                duiz = true;
-                if (figur < 10){
-                  hon = true; 
-                }
-              } else {
-                duiz = false;
-              }
-            }
-            break;
-          case 2:
-            if (duiz == true) {
-              digitalWrite(digits[j], LOW);
-              lightNumber(0);
-              delayMicroseconds(Delay);
-            } if (hon == true) {
-              break;
-            }
-          
-            if (figur > 99 && figur < 1000){
-              digitalWrite(digits[j], LOW);
-              lightNumber(figur / 100);
-              figur %= 100;
-              delayMicroseconds(Delay); 
-              if (figur < 10){
-              hon = true;
-              } else {
-                hon = false;
-              }
-            }
-            break;
-          case 3:
-            if(hon == true){
-              digitalWrite(digits[j], LOW);
-              lightNumber(0);
-              delayMicroseconds(Delay);
-              break;
-            }
-          
-            if(figur > 9 && figur < 100){
-              digitalWrite(digits[j], LOW);
-              lightNumber(figur / 10); 
-              figur %= 10;
-              delayMicroseconds(Delay); 
-            }
-            break;
-
-          case 4:
-            if (figur < 10) {
-              digitalWrite(digits[j], LOW);
-              lightNumber(figur); 
-              delayMicroseconds(Delay); 
-              break;
-            }
-            break;
-        }
-        //Turn off all segments
-        lightNumber(-1); 
-
-        //Turn off all digits
-        digitalWrite(digits[0], HIGH);
-        digitalWrite(digits[1], HIGH);
-        digitalWrite(digits[2], HIGH);
-        digitalWrite(digits[3], HIGH);
-      }
-      delayMicroseconds(1500);
-    }
-  }
-}
-*/
-
 void setup() {
   Serial.begin(9600);
 
@@ -379,15 +326,21 @@ void setup() {
   pinMode(D2, OUTPUT);  
   pinMode(D3, OUTPUT);  
   pinMode(D4, OUTPUT);
+
+  getCurrentTime();
 }
 
 void loop() {
+  getCurrentTime();
   reconnectMQTTClient();
   client.loop();
 
+  if (alarm_set) {
+    
+  }
+
   for(int j = 1; j <= 4; j++) {
     //Turn on a digit for a short amount of time
-    //Serial.print(j);
     switch(j) {
       case 1:
         dot = false;
