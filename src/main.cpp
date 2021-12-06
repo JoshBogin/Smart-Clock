@@ -64,27 +64,21 @@ void connectWiFi()
 
 void clientCallback(char *topic, uint8_t *payload, unsigned int length)
 {
-  Serial.print("callback\n");
   char buff[length + (unsigned int)1];
+
   for (int i = 0; i < length; i++)
   {
     buff[i] = (char)payload[i];
   }
   buff[length] = '\0';
 
-  Serial.print(*buff);
-  
-  //char * returns[length] = { strtok(*buff, ":") };
-  //Serial.print("\nreturns: ");
-  //Serial.println(*returns);
-  int hrs = int(buff[0] + buff[1]);
-  int mins = int(buff[2] + buff[3]);
-  Serial.print("\nhrs: ");
-  Serial.println(hrs);
-  Serial.print("\nmins: ");
-  Serial.println(mins);
-  hours = hrs;
-  minutes = mins;
+  Serial.print(buff);
+
+  String message = buff;
+  String hrs = message.substring(0, 2);
+  String mins = message.substring(3, 5);
+  hours = hrs.toInt();
+  minutes = mins.toInt();
 }
 
 void reconnectMQTTClient() {
@@ -365,9 +359,6 @@ void num_loop() {
 
 void setup() {
   Serial.begin(9600);
-
-    // Defined in IFTTTWebhookMKG.h
-  initProperties();
 
   while (!Serial)
     Serial.print("."); // Wait for Serial to be ready
