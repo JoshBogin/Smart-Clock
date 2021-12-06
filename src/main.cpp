@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <ctime>
+#include <ESP8266WiFi.h>
 
 using namespace std;
 
@@ -29,7 +30,7 @@ boolean dot = false;
 int hours = 0;
 int minutes = 0;
 // alarm time vars
-boolean alarm_set = false
+boolean alarm_set = false;
 int alarm_hours = 8;
 int alarm_minutes = 46;
 
@@ -61,7 +62,6 @@ void getCurrentTime() {
 
   hours = curtime->tm_hour;
   minutes = curtime->tm_min;
-  Serial.print(String(ctime(curtime)) + "\n");
   Serial.print(String(hours) + ":" + String(minutes) + "\n");
 
   // need to figure out funny way to maintain a fake time, so I could make it
@@ -327,6 +327,7 @@ void setup() {
   pinMode(D3, OUTPUT);  
   pinMode(D4, OUTPUT);
 
+  configTime(MYTZ, "pool.ntp.org", "time.nist.gov");
   getCurrentTime();
 }
 
@@ -336,7 +337,7 @@ void loop() {
   client.loop();
 
   if (alarm_set) {
-    
+
   }
 
   for(int j = 1; j <= 4; j++) {
