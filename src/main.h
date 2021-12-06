@@ -1,6 +1,4 @@
 #include <WiFiNINA.h>
-#include <ArduinoIoTCloud.h>
-#include <Arduino_ConnectionHandler.h>
 
 char SSID[] = "Wes";   // the name of your network/HotSpot
 char PASS[] = "passedword";  // the password of your WiFi

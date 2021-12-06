@@ -1,37 +1,42 @@
 #include <Arduino.h>
-#include <SNU.h>
 #include "main.h"
 #include <PubSubClient.h>
-#include <iostream>
-#include <string>
 
 using namespace std;
 
-int pinA = 0;
-int pinB = 1;
-int pinC = 2;
-int pinD = 3;
-int pinE = 4;
-int pinF = 5;
-int pinG = 6;
-int pinDP = 7;
+const int pinA = 0;
+const int pinB = 1;
+const int pinC = 2;
+const int pinD = 3;
+const int pinE = 4;
+const int pinF = 5;
+const int pinG = 6;
+const int Button = 7;
 
-int D1 = 8;
-int D2 = 9;
-int D3 = 10;
-int D4 = 11;
+const int D1 = 8;
+const int D2 = 9;
+const int D3 = 10;
+const int D4 = 11;
 int digits[4] = {D1, D2, D3, D4};
+
+// alarm and disarm button
+const int Buzzer = 12;
+const int pinDP = A6;
+const int Light = A5;
+int buttonVal;
 
 boolean dot = false;
 
 // current time vars
 int hours = 0;
-int minutes = 0;
+int minutes = 10;
+int seconds = 0;
 unsigned long lastMinute = 0;
+boolean validateSeconds = false;
 // alarm time vars
 boolean alarm_set = false;
-int alarm_hours = 25;
-int alarm_minutes = 0;
+int alarm_hours = 0;
+int alarm_minutes = 8;
 
 #define Delay 1000
 
@@ -72,13 +77,16 @@ void clientCallback(char *topic, uint8_t *payload, unsigned int length)
   String message = buff;
   String hrs = message.substring(0, 2);
   String mins = message.substring(3, 5);
+  String secs = message.substring(6, 8);
 
   Serial.print(rec_topic + "\n");
 
   if (rec_topic == "t/time") {
     hours = hrs.toInt();
     minutes = mins.toInt();
+    seconds = secs.toInt();
     lastMinute = millis();
+    validateSeconds = true;
   } else {
     alarm_hours = hrs.toInt();
     alarm_minutes = mins.toInt();
@@ -299,13 +307,18 @@ void setup() {
   pinMode(D2, OUTPUT);  
   pinMode(D3, OUTPUT);  
   pinMode(D4, OUTPUT);
+  pinMode(Buzzer, OUTPUT);
+  pinMode(Button, INPUT_PULLUP);
+  pinMode(Light, OUTPUT);
+  digitalWrite(Light, LOW);
+  noTone(Buzzer);
 }
 
 void loop() {
   reconnectMQTTClient();
   client.loop();
 
-  if (millis() >= lastMinute + 60000) {
+  if ((validateSeconds && millis() >= lastMinute + ((60 - seconds) * 1000)) || (millis() >= lastMinute + 60000)) {
     minutes++;
 
     if (minutes >= 60) {
@@ -317,15 +330,27 @@ void loop() {
       minutes = 0;
     }
     lastMinute = millis();
+    validateSeconds = false;
   }
 
   if (alarm_set) {
-    if (alarm_hours >= hours && alarm_minutes >= minutes) {
-      Serial.print("ALARM ALARM WAKE UP MOTHERFUCKER");
+    if (alarm_hours <= hours && alarm_minutes <= minutes) {
+      Serial.print("ALARM ALARM WAKE UP MOTHERFUCKER\n");
+      tone(Buzzer, 7000);
+      digitalWrite(Light, HIGH);
+      // maybe add something here to make the clock digits flicker on and off
+      // would just be turning off all digits and then delaying and then the loop would turn them back on
       alarm_set = false;
     }
   }
 
+  buttonVal = digitalRead(Button);
+  if (buttonVal == LOW) {
+    Serial.print("Alarm disarmed\n");
+    noTone(Buzzer);
+    digitalWrite(Light, LOW);
+  }
+  
   for(int j = 1; j <= 4; j++) {
     //Turn on a digit for a short amount of time
     switch(j) {
