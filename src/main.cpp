@@ -30,7 +30,7 @@ const int Light = A5;
 int buttonVal;
 
 // lcd module pins
-const int rs = A4,
+const int rs = 14,
           en = 13,
           d4 = A3,
           d5 = A2,
@@ -96,12 +96,21 @@ void clientCallback(char *topic, uint8_t *payload, unsigned int length)
 
   Serial.print(rec_topic + "\n");
 
-  if (rec_topic == "t/time") {
+  if (rec_topic == TIME_TOPIC) {
     hours = hrs.toInt();
     minutes = mins.toInt();
     seconds = secs.toInt();
     lastMinute = millis();
     validateSeconds = true;
+  } else if (rec_topic == MESSAGE_TOPIC) {
+    lcd.clear();
+    if (message.length() > 16) {
+      lcd.write(message.substring(0, 16).c_str());
+      lcd.setCursor(0, 1);
+      lcd.write(message.substring(16, message.length()).c_str());
+    } else {
+      lcd.write(message.c_str());
+    }
   } else {
     alarm_hours = hrs.toInt();
     alarm_minutes = mins.toInt();
@@ -119,6 +128,7 @@ void reconnectMQTTClient() {
       Serial.println("Connected");
       client.subscribe(TIME_TOPIC.c_str());
       client.subscribe(ALARM_TOPIC.c_str());
+      client.subscribe(MESSAGE_TOPIC.c_str());
     } else {
       Serial.print("Connection Failed! Retrying in 5 seconds...");
       Serial.println(client.state());
@@ -336,9 +346,6 @@ void setup() {
   pinMode(d6, OUTPUT);     
   pinMode(d7, OUTPUT);
   lcd.begin(16, 2);
-  lcd.print("Google EnPassant");
-  lcd.setCursor(0, 1);
-  lcd.print("Holy Hell");
 }
 
 void loop() {
@@ -373,7 +380,6 @@ void loop() {
 
   buttonVal = digitalRead(Button);
   if (buttonVal == LOW) {
-    Serial.print("Alarm disarmed\n");
     noTone(Buzzer);
     digitalWrite(Light, LOW);
   }
