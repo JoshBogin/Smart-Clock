@@ -1,29 +1,44 @@
 #include <Arduino.h>
 #include "main.h"
 #include <PubSubClient.h>
+#include <LiquidCrystal.h>
+#include <Wire.h>
 
 using namespace std;
 
-const int pinA = 0;
-const int pinB = 1;
-const int pinC = 2;
-const int pinD = 3;
-const int pinE = 4;
-const int pinF = 5;
-const int pinG = 6;
-const int Button = 7;
+// 7-seg segment pins
+const int pinA = 0,
+          pinB = 1,
+          pinC = 2,
+          pinD = 3,
+          pinE = 4,
+          pinF = 5,
+          pinG = 6,
+          pinDP = A6;
 
-const int D1 = 8;
-const int D2 = 9;
-const int D3 = 10;
-const int D4 = 11;
+// 7-seg digit pins
+const int D1 = 8,
+          D2 = 9,
+          D3 = 10,
+          D4 = 11;
 int digits[4] = {D1, D2, D3, D4};
 
-// alarm and disarm button
+// alarm and disarm button pins
 const int Buzzer = 12;
-const int pinDP = A6;
+const int Button = 7;
 const int Light = A5;
 int buttonVal;
+
+// lcd module pins
+const int rs = A4,
+          en = 13,
+          d4 = A3,
+          d5 = A2,
+          d6 = A1,
+          d7 = A0;
+
+// Initialize the LCD
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 
 boolean dot = false;
 
@@ -294,7 +309,7 @@ void setup() {
   connectWiFi();
   createMQTTClient();
 
-  // initialize the digital pins as outputs.
+  // initialize the digital pins as outputs
   pinMode(pinA, OUTPUT);     
   pinMode(pinB, OUTPUT);     
   pinMode(pinC, OUTPUT);     
@@ -312,6 +327,18 @@ void setup() {
   pinMode(Light, OUTPUT);
   digitalWrite(Light, LOW);
   noTone(Buzzer);
+
+  // set lcd screen
+  pinMode(rs, OUTPUT);     
+  pinMode(en, OUTPUT);     
+  pinMode(d4, OUTPUT);     
+  pinMode(d5, OUTPUT);     
+  pinMode(d6, OUTPUT);     
+  pinMode(d7, OUTPUT);
+  lcd.begin(16, 2);
+  lcd.print("Google EnPassant");
+  lcd.setCursor(0, 1);
+  lcd.print("Holy Hell");
 }
 
 void loop() {
