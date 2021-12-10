@@ -3,8 +3,16 @@
 #include <PubSubClient.h>
 #include <LiquidCrystal.h>
 #include <Wire.h>
+#include <Adafruit_Sensor.h>
+#include <DHT.h>
 
 using namespace std;
+
+#define DHTPIN 14
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+#define Delay 1000
 
 // 7-seg segment pins
 const int pinA = 0,
@@ -30,7 +38,7 @@ const int Light = A5;
 int buttonVal;
 
 // lcd module pins
-const int rs = 14,
+const int rs = A4,
           en = 13,
           d4 = A3,
           d5 = A2,
@@ -52,8 +60,6 @@ boolean validateSeconds = false;
 boolean alarm_set = false;
 int alarm_hours = 0;
 int alarm_minutes = 8;
-
-#define Delay 1000
 
 WiFiClient wifiClient;
 PubSubClient client(wifiClient);
@@ -144,6 +150,7 @@ void createMQTTClient()
   reconnectMQTTClient();
 }
 
+// help from: https://create.arduino.cc/editor/LogMaker360/61a7eea9-1030-4295-b576-cd37a601cf50/preview
 // function to set a light to a given number
 void lightNumber(int numberToDisplay, boolean isDot) {
   switch (numberToDisplay) {
@@ -314,12 +321,14 @@ void setup() {
   Serial.begin(9600);
 
   while (!Serial)
-    Serial.print("."); // Wait for Serial to be ready
+    Serial.print(""); // Wait for Serial to be ready
 
   connectWiFi();
   createMQTTClient();
 
-  // initialize the digital pins as outputs
+  dht.begin();
+
+  // initialize pins for input and output
   pinMode(pinA, OUTPUT);     
   pinMode(pinB, OUTPUT);     
   pinMode(pinC, OUTPUT);     
@@ -335,7 +344,10 @@ void setup() {
   pinMode(Buzzer, OUTPUT);
   pinMode(Button, INPUT_PULLUP);
   pinMode(Light, OUTPUT);
+  //pinMode(DHTPIN, INPUT);
   digitalWrite(Light, LOW);
+
+  // make sure buzzer is off to start
   noTone(Buzzer);
 
   // set lcd screen
@@ -346,12 +358,18 @@ void setup() {
   pinMode(d6, OUTPUT);     
   pinMode(d7, OUTPUT);
   lcd.begin(16, 2);
+  lcd.setCursor(5, 0);
+  lcd.write("Hello!");
+
+  // delay before using sensor
+  delay(2000);
 }
 
 void loop() {
   reconnectMQTTClient();
   client.loop();
 
+  // check when next minute should be iterated
   if ((validateSeconds && millis() >= lastMinute + ((60 - seconds) * 1000)) || (millis() >= lastMinute + 60000)) {
     minutes++;
 
@@ -367,25 +385,26 @@ void loop() {
     validateSeconds = false;
   }
 
+  // check for alarm
   if (alarm_set) {
     if (alarm_hours <= hours && alarm_minutes <= minutes) {
-      Serial.print("ALARM ALARM WAKE UP MOTHERFUCKER\n");
+      Serial.print("ALARM ALARM WAKE UP\n");
       tone(Buzzer, 7000);
       digitalWrite(Light, HIGH);
-      // maybe add something here to make the clock digits flicker on and off
-      // would just be turning off all digits and then delaying and then the loop would turn them back on
       alarm_set = false;
     }
   }
 
+  // turn off alarm if button is pressed
   buttonVal = digitalRead(Button);
   if (buttonVal == LOW) {
     noTone(Buzzer);
     digitalWrite(Light, LOW);
   }
   
+  // loop for setting the current time digits
   for(int j = 1; j <= 4; j++) {
-    //Turn on a digit for a short amount of time
+    // Turn on a digit for a short amount of time
     switch(j) {
       case 1:
         dot = false;
@@ -432,5 +451,9 @@ void loop() {
     digitalWrite(digits[2], HIGH);
     digitalWrite(digits[3], HIGH);
   }
-  delayMicroseconds(Delay); 
+
+  delayMicroseconds(2500);
+
+  Serial.print(String(dht.readTemperature(true)) + "\n");
+  
 }
