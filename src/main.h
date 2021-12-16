@@ -1,7 +1,7 @@
 #include <WiFiNINA.h>
 
-char SSID[] = "ChamplainPSK";   // the name of your network/HotSpot
-char PASS[] = "letusdare";  // the password of your WiFi
+char SSID[] = "Wes";   // the name of your network/HotSpot
+char PASS[] = "passedword";  // the password of your WiFi
 
 // MQTT settings
 const String ID = "smart";

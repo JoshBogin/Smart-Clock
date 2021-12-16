@@ -51,8 +51,8 @@ LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
 boolean dot = false;
 
 // current time vars
-int hours = 0;
-int minutes = 10;
+int hours = 12;
+int minutes = 0;
 int seconds = 0;
 unsigned long lastMinute = 0;
 boolean validateSeconds = false;
@@ -67,17 +67,36 @@ PubSubClient client(wifiClient);
 int time_now = 0;
 unsigned long lastInterval = 0;
 
+unsigned long lastTemperature = 0;
+float temperature = 0;
+
+String customMessage = "";
+
 void connectWiFi()
 {
   while (WiFi.status() != WL_CONNECTED)
   {
-    Serial.println("Connecting to WiFi..");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.write("Connecting...");
+    Serial.println("Connecting to WiFi...");
     WiFi.begin(SSID, PASS);
     delay(500);
   }
 
   Serial.println("Connected!");
   Serial.println(WiFi.localIP());
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.write("Connected!");
+}
+
+void setDisplay(String top, String bottom) {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.write(top.c_str());
+  lcd.setCursor(0, 1);
+  lcd.write(bottom.c_str());
 }
 
 void clientCallback(char *topic, uint8_t *payload, unsigned int length)
@@ -108,8 +127,13 @@ void clientCallback(char *topic, uint8_t *payload, unsigned int length)
     seconds = secs.toInt();
     lastMinute = millis();
     validateSeconds = true;
+    setDisplay("Time Received!", customMessage);
+    lastTemperature = millis(); // Temperature should come back after 5 seconds
   } else if (rec_topic == MESSAGE_TOPIC) {
-    lcd.clear();
+    customMessage = message;
+    setDisplay("Temp: " + String(temperature) + " F", customMessage);
+    // This code allows for double line messages
+    /*
     if (message.length() > 16) {
       lcd.write(message.substring(0, 16).c_str());
       lcd.setCursor(0, 1);
@@ -117,9 +141,18 @@ void clientCallback(char *topic, uint8_t *payload, unsigned int length)
     } else {
       lcd.write(message.c_str());
     }
+    */
   } else {
     alarm_hours = hrs.toInt();
     alarm_minutes = mins.toInt();
+    
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.write("Alarm Set!");
+    lastTemperature = millis(); // Temperature should come back after 5 seconds
+    lcd.setCursor(0, 1);
+    lcd.write(customMessage.c_str());
+
     Serial.print("Alarm Set!\n");
     Serial.print(String(alarm_hours) + ":" + String(alarm_minutes) + "\n");
     alarm_set = true;
@@ -344,7 +377,6 @@ void setup() {
   pinMode(Buzzer, OUTPUT);
   pinMode(Button, INPUT_PULLUP);
   pinMode(Light, OUTPUT);
-  //pinMode(DHTPIN, INPUT);
   digitalWrite(Light, LOW);
 
   // make sure buzzer is off to start
@@ -358,8 +390,6 @@ void setup() {
   pinMode(d6, OUTPUT);     
   pinMode(d7, OUTPUT);
   lcd.begin(16, 2);
-  lcd.setCursor(5, 0);
-  lcd.write("Hello!");
 
   // delay before using sensor
   delay(2000);
@@ -393,6 +423,15 @@ void loop() {
       digitalWrite(Light, HIGH);
       alarm_set = false;
     }
+  }
+
+  // take temperature reading every n seconds
+  if (millis() >= lastTemperature + 5000) {
+    lastTemperature = millis();
+    temperature = dht.readTemperature(true);
+    client.publish("t/temperature", String(temperature).c_str());
+
+    setDisplay("Temp: " + String(temperature) + " F", customMessage);
   }
 
   // turn off alarm if button is pressed
@@ -453,7 +492,4 @@ void loop() {
   }
 
   delayMicroseconds(2500);
-
-  Serial.print(String(dht.readTemperature(true)) + "\n");
-  
 }
